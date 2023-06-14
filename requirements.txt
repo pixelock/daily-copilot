@@ -1,0 +1,8 @@
+accelerate
+cpm_kernels
+fire
+flask
+langchain
+nvidia-ml-py
+sentencepiece
+transformers
