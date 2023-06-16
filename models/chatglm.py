@@ -6,9 +6,11 @@
 from typing import Dict, Optional, Any, List
 from torch.nn import Module
 from transformers import AutoModel, AutoTokenizer
+from peft import LoraConfig, get_peft_model
 
 from models.base import BaseModel
 from configs.models import ChatGLMConfig
+from configs.training import TrainingConfig
 from configs.cuda import NUM_GPU
 from utils.cuda import fetch_available_gpus, check_gpu_status
 
@@ -83,34 +85,63 @@ def auto_configure_device_map(num_gpus: int = None, device_ids: List[int] = None
 
 
 class ChatGLM(BaseModel):
-    def __init__(self, model_name_or_path, config: ChatGLMConfig = None, model_kwargs={}, tokenizer_kwargs={}):
-        self.model_name_or_path = model_name_or_path
+    def __init__(self,
+                 model_name_or_path: str = None,
+                 config: ChatGLMConfig = None,
+                 training_config: TrainingConfig = None,
+                 lora_config: LoraConfig = None):
+        self.model_name_or_path = model_name_or_path or config.model_name_or_path
         self.config = config
-        self.model = self.init_model(**model_kwargs)
-        self.tokenizer = self.init_tokenizer(**tokenizer_kwargs)
+        self.training_config = training_config
+        self.lora_config = lora_config
+        self.model = self.init_model()
+        self.tokenizer = self.init_tokenizer()
+        self.do_train = bool(self.training_config is not None and self.training_config.do_train)
 
     def init_model(self, **kwargs):
-        if self.config.device == 'cpu':
-            model = AutoModel.from_pretrained(
-                self.model_name_or_path,
-                trust_remote_code=True,
-                **kwargs,
-            ).float()
-        elif self.config.multi_gpu and NUM_GPU > 1:
-            model = load_model_on_multi_gpus(
-                checkpoint_path=self.model_name_or_path,
-                quantization=self.config.quant_bit if self.config.use_quant else 'float16',
-                verbose=True,
-                **kwargs,
-            )
-        else:
-            model = AutoModel.from_pretrained(
-                self.model_name_or_path,
-                trust_remote_code=True,
-                **kwargs,
-            ).half().to(self.config.device)
+        if self.do_train:
+            if self.training_config.use_quant:
+                if self.training_config.quant_bit == 'int8':
+                    model = AutoModel.from_pretrained(
+                        self.model_name_or_path,
+                        load_in_8bit=True,
+                        device_map="auto",
+                        trust_remote_code=True,
+                    )
+                    model.use_cache = False
+                    model.gradient_checkpointing_enable()
+                else:
+                    raise ValueError(f'unsupported quant bit: {self.training_config.quant_bit}')
+            else:
+                model = AutoModel.from_pretrained(
+                    self.model_name_or_path,
+                    trust_remote_code=True,
+                )
 
-        model.eval()
+            if self.training_config.use_lora:
+                model = self.get_lora_model(model)
+        else:
+            if self.config.device == 'cpu':
+                model = AutoModel.from_pretrained(
+                    self.model_name_or_path,
+                    trust_remote_code=True,
+                    **kwargs,
+                ).float()
+            elif self.config.multi_gpu and NUM_GPU > 1:
+                model = load_model_on_multi_gpus(
+                    checkpoint_path=self.model_name_or_path,
+                    quantization=self.config.quant_bit if self.config.use_quant else 'float16',
+                    verbose=True,
+                    **kwargs,
+                )
+            else:
+                model = AutoModel.from_pretrained(
+                    self.model_name_or_path,
+                    trust_remote_code=True,
+                    **kwargs,
+                ).half().to(self.config.device)
+
+            model.eval()
 
         return model
 
@@ -118,7 +149,11 @@ class ChatGLM(BaseModel):
         tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, trust_remote_code=True, **kwargs)
         return tokenizer
 
+    def get_lora_model(self, model):
+        model = get_peft_model(model, self.lora_config)
+        return model
+
     @classmethod
-    def from_pretrained(cls, model_name_or_path, config: ChatGLMConfig):
+    def from_pretrained(cls, model_name_or_path, config: ChatGLMConfig, training_config: TrainingConfig):
         model = cls(model_name_or_path=model_name_or_path, config=config)
         return model
