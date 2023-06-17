@@ -28,13 +28,21 @@ class ModelConfig:
         default=None,
         metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
     )
-    torch_dtype: Optional[str] = field(
+    quant_bit: Optional[str] = field(
         default=None,
         metadata={
-            "help": "Override the default `torch.dtype` and load the model under this dtype. If `auto` is passed, the "
-                    "dtype will be automatically derived from the model's weights.",
-            "choices": ["auto", "bfloat16", "float16", "float32"],
-        },
+            'help': 'model quantization bit',
+            'choice': ['int8', 'int4'],
+        }
+    )
+    resume_lora_training: Optional[bool] = field(
+        default=True,
+        metadata={
+            'help': 'Whether to resume training from the last LoRA weights or create new weights after merging them.'}
+    )
+    checkpoint_dir: Optional[str] = field(
+        default=None,
+        metadata={'help': 'Path to the directory containing the model checkpoints as well as the configurations.'}
     )
     model_type: Optional[str] = None
 
@@ -44,7 +52,6 @@ class ChatGLMConfig(ModelConfig):
     temperature: float = 0.75
     top_p: float = 0.9
     max_tokens: int = 2048
-    pre_seq_len: Optional[int] = None
 
     def __post_init__(self):
-        self.model_type = 'ChatGLM'
+        self.model_type = 'chatglm'

@@ -98,6 +98,13 @@ class ChatGLM(BaseModel):
         self.tokenizer = self.init_tokenizer()
         self.do_train = bool(self.training_config is not None and self.training_config.do_train)
 
+    def load_tokenizer(self, **kwargs):
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, trust_remote_code=True, **kwargs)
+        return tokenizer
+
+    def load_original_model(self, **kwargs):
+        pass
+
     def init_model(self, **kwargs):
         if self.do_train:
             if self.training_config.use_quant:
