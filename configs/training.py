@@ -20,6 +20,7 @@ class FinetuningConfig:
             'choices': ['full', 'lora', 'ptv2'],
         }
     )
+    use_gradient_checkpointing: bool = True
 
     """Lora fine-tuning arguments"""
     lora_rank: int = field(default=8, metadata={'help': 'lora attention dimension'})

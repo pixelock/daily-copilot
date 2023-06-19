@@ -7,13 +7,13 @@ from typing import Dict, Optional, Any, List
 from torch.nn import Module
 from transformers import AutoModel, AutoTokenizer
 from transformers import BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model
 
 from models.base import BaseModel
 from configs.models import ChatGLMConfig
 from configs.training import FinetuningConfig
 from configs.cuda import NUM_GPU
 from utils.cuda import fetch_available_gpus, check_gpu_status
+from utils.quant import prepare_model_for_kbit_training
 
 CHATGLM_GPU_MEMORY_MAP = {
     'float16': 15000,
@@ -126,6 +126,11 @@ class ChatGLM(BaseModel):
             self.model_args.model_name_or_path,
             **self.model_kwargs,
         )
+        model = prepare_model_for_kbit_training(
+            model=model,
+            use_gradient_checkpointing=self.finetuning_args.use_gradient_checkpointing,
+        )
+        return model
 
 
     # def init_model(self, **kwargs):
