@@ -6,11 +6,12 @@
 from typing import Dict, Optional, Any, List
 from torch.nn import Module
 from transformers import AutoModel, AutoTokenizer
+from transformers import BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model
 
 from models.base import BaseModel
 from configs.models import ChatGLMConfig
-from configs.training import TrainingConfig
+from configs.training import FinetuningConfig
 from configs.cuda import NUM_GPU
 from utils.cuda import fetch_available_gpus, check_gpu_status
 
@@ -85,82 +86,91 @@ def auto_configure_device_map(num_gpus: int = None, device_ids: List[int] = None
 
 
 class ChatGLM(BaseModel):
-    def __init__(self,
-                 model_name_or_path: str = None,
-                 config: ChatGLMConfig = None,
-                 training_config: TrainingConfig = None,
-                 lora_config: LoraConfig = None):
-        self.model_name_or_path = model_name_or_path or config.model_name_or_path
-        self.config = config
-        self.training_config = training_config
-        self.lora_config = lora_config
-        self.model = self.init_model()
-        self.tokenizer = self.init_tokenizer()
-        self.do_train = bool(self.training_config is not None and self.training_config.do_train)
+    def prepare_env(self):
+        model_kwargs = {
+            'trust_remote_code': True,
+        }
 
-    def load_tokenizer(self, **kwargs):
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, trust_remote_code=True, **kwargs)
-        return tokenizer
+        if self.model_args.quant_bit is not None:
+            model_kwargs['device_map'] = 'auto'
 
-    def load_original_model(self, **kwargs):
-        pass
-
-    def init_model(self, **kwargs):
-        if self.do_train:
-            if self.training_config.use_quant:
-                if self.training_config.quant_bit == 'int8':
-                    model = AutoModel.from_pretrained(
-                        self.model_name_or_path,
-                        load_in_8bit=True,
-                        device_map="auto",
-                        trust_remote_code=True,
-                    )
-                    model.use_cache = False
-                    model.gradient_checkpointing_enable()
-                else:
-                    raise ValueError(f'unsupported quant bit: {self.training_config.quant_bit}')
-            else:
-                model = AutoModel.from_pretrained(
-                    self.model_name_or_path,
-                    trust_remote_code=True,
+            if self.model_args.quant_bit == 'int8':
+                model_kwargs['load_in_8bit'] = True
+                model_kwargs['quantization_config'] = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                    llm_int8_threshold=6.0
+                )
+            elif self.model_args.quant_bit == 'int4':
+                model_kwargs['load_in_4bit'] = True
+                model_kwargs['quantization_config'] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=self.model_args.compute_dtype,
+                    bnb_4bit_use_double_quant=self.model_args.double_quant,
+                    bnb_4bit_quant_type=self.model_args.quant_type_4bit,
                 )
 
-            if self.training_config.use_lora:
-                model = self.get_lora_model(model)
-        else:
-            if self.config.device == 'cpu':
-                model = AutoModel.from_pretrained(
-                    self.model_name_or_path,
-                    trust_remote_code=True,
-                    **kwargs,
-                ).float()
-            elif self.config.multi_gpu and NUM_GPU > 1:
-                model = load_model_on_multi_gpus(
-                    checkpoint_path=self.model_name_or_path,
-                    quantization=self.config.quant_bit if self.config.use_quant else 'float16',
-                    verbose=True,
-                    **kwargs,
-                )
-            else:
-                model = AutoModel.from_pretrained(
-                    self.model_name_or_path,
-                    trust_remote_code=True,
-                    **kwargs,
-                ).half().to(self.config.device)
+        self.model_kwargs = model_kwargs
 
-            model.eval()
-
-        return model
-
-    def init_tokenizer(self, **kwargs):
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, trust_remote_code=True, **kwargs)
+    def prepare_tokenizer(self):
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.model_args.model_name_or_path,
+            trust_remote_code=True,
+            cache_dir=self.model_args.cache_dir,
+            use_fast=self.model_args.use_fast_tokenizer,
+            padding_side='left',
+        )
         return tokenizer
 
-    def get_lora_model(self, model):
-        model = get_peft_model(model, self.lora_config)
-        return model
+    def prepare_model_for_training(self):
+        model = AutoModel(
+            self.model_args.model_name_or_path,
+            **self.model_kwargs,
+        )
 
-    @classmethod
-    def from_pretrained(cls, model_name_or_path, config: ChatGLMConfig, training_config: TrainingConfig):
-        model = cls(model_name_or_path=model_name_or_path, config=config)
-        return model
+
+    # def init_model(self, **kwargs):
+    #     if self.do_train:
+    #         if self.training_config.use_quant:
+    #             if self.training_config.quant_bit == 'int8':
+    #                 model = AutoModel.from_pretrained(
+    #                     self.model_name_or_path,
+    #                     load_in_8bit=True,
+    #                     device_map="auto",
+    #                     trust_remote_code=True,
+    #                 )
+    #                 model.use_cache = False
+    #                 model.gradient_checkpointing_enable()
+    #             else:
+    #                 raise ValueError(f'unsupported quant bit: {self.training_config.quant_bit}')
+    #         else:
+    #             model = AutoModel.from_pretrained(
+    #                 self.model_name_or_path,
+    #                 trust_remote_code=True,
+    #             )
+    #
+    #         if self.training_config.use_lora:
+    #             model = self.get_lora_model(model)
+    #     else:
+    #         if self.config.device == 'cpu':
+    #             model = AutoModel.from_pretrained(
+    #                 self.model_name_or_path,
+    #                 trust_remote_code=True,
+    #                 **kwargs,
+    #             ).float()
+    #         elif self.config.multi_gpu and NUM_GPU > 1:
+    #             model = load_model_on_multi_gpus(
+    #                 checkpoint_path=self.model_name_or_path,
+    #                 quantization=self.config.quant_bit if self.config.use_quant else 'float16',
+    #                 verbose=True,
+    #                 **kwargs,
+    #             )
+    #         else:
+    #             model = AutoModel.from_pretrained(
+    #                 self.model_name_or_path,
+    #                 trust_remote_code=True,
+    #                 **kwargs,
+    #             ).half().to(self.config.device)
+    #
+    #         model.eval()
+    #
+    #     return model

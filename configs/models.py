@@ -5,6 +5,7 @@
 
 from typing import Optional
 from dataclasses import dataclass, field
+import torch
 
 
 @dataclass
@@ -28,6 +29,14 @@ class ModelConfig:
         default=None,
         metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
     )
+
+    # Tokenizer
+    use_fast_tokenizer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."}
+    )
+
+    # Quantization
     quant_bit: Optional[str] = field(
         default=None,
         metadata={
@@ -35,6 +44,23 @@ class ModelConfig:
             'choice': ['int8', 'int4'],
         }
     )
+    compute_dtype: Optional[torch.dtype] = field(
+        default=None,
+        metadata={"help": "Used in quantization configs. Do not specify this argument manually."}
+    )
+    double_quant: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether to use double quantization in int4 training or not."}
+    )
+    quant_type_4bit: Optional[str] = field(
+        default='nf4',
+        metadata={
+            "help": "Quantization data type to use in int4 training.",
+            'choice': ['fp4', 'nf4']
+        }
+    )
+
+    # resume adapter
     resume_lora_training: Optional[bool] = field(
         default=True,
         metadata={
@@ -44,6 +70,7 @@ class ModelConfig:
         default=None,
         metadata={'help': 'Path to the directory containing the model checkpoints as well as the configurations.'}
     )
+
     model_type: Optional[str] = None
 
 
