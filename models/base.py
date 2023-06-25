@@ -7,9 +7,9 @@ from typing import Any, Optional
 from abc import ABC, abstractmethod
 from peft import LoraConfig, get_peft_model, PeftModel, TaskType
 
-from configs.models import ModelConfig
-from configs.training import FinetuningConfig
-from configs.inference import InferenceConfig
+from augments.models import ModelConfig
+from augments.training import FinetuningConfig
+from augments.inference import InferenceConfig
 from logger import logger
 
 

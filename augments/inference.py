@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class InferenceConfig:
+class InferenceAugments:
     finetuning_type: Optional[str] = field(
         default='lora',
         metadata={

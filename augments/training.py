@@ -12,7 +12,7 @@ from transformers.trainer_utils import get_last_checkpoint
 
 
 @dataclass
-class FinetuningConfig:
+class FinetuningArguments:
     finetuning_type: Optional[str] = field(
         default='lora',
         metadata={
@@ -24,9 +24,9 @@ class FinetuningConfig:
 
     """Lora fine-tuning arguments"""
     lora_rank: int = field(default=8, metadata={'help': 'lora attention dimension'})
-    lora_alpha: int = field(default=None, metadata={'help': 'lora alpha'})
-    lora_dropout: float = field(default=None, metadata={'help': 'lora dropout'})
-    lora_target: Optional[Union[List[str], str]] = field(
+    lora_alpha: int = field(default=32, metadata={'help': 'lora alpha'})
+    lora_dropout: float = field(default=0.01, metadata={'help': 'lora dropout'})
+    lora_target: Optional[List[str]] = field(
         default=None,
         metadata={
             'help': "List of module names or regex expression of the module names to replace with Lora."
@@ -54,28 +54,3 @@ class FinetuningConfig:
         with open(json_path, 'r', encoding='utf-8') as f:
             text = f.read()
         return cls(**json.loads(text))
-
-
-# @dataclass
-# class TrainingConfig(TrainingArguments):
-#     model_type: str = 'chatglm'
-#     use_lora: bool = True
-#     use_quant: bool = True
-#     quant_bit: Optional[str] = 'int8'
-#     last_checkpoint: Optional[str] = None
-#
-#     def __post_init__(self):
-#         super().__post_init__()
-#
-#         if self.output_dir and os.path.isdir(self.output_dir) and self.do_train and not self.overwrite_output_dir:
-#             self.last_checkpoint = get_last_checkpoint(self.output_dir)
-#             if self.last_checkpoint is not None and len(os.listdir(self.output_dir)):
-#                 raise ValueError(
-#                     f"Output directory ({self.output_dir}) already exists and is not empty. "
-#                     "Use --overwrite_output_dir to overcome."
-#                 )
-#             elif self.last_checkpoint is not None and self.resume_from_checkpoint is None:
-#                 print(
-#                     f"Checkpoint detected, resuming training at {self.last_checkpoint}. To avoid this behavior, change "
-#                     "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-#                 )

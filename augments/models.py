@@ -9,7 +9,7 @@ import torch
 
 
 @dataclass
-class ModelConfig:
+class ModelArguments:
     model_name_or_path: Optional[str] = field(
         default=None,
         metadata={
@@ -41,7 +41,7 @@ class ModelConfig:
         default=None,
         metadata={
             'help': 'model quantization bit',
-            'choice': ['int8', 'int4'],
+            'choices': ['int8', 'int4'],
         }
     )
     compute_dtype: Optional[torch.dtype] = field(
@@ -56,7 +56,7 @@ class ModelConfig:
         default='nf4',
         metadata={
             "help": "Quantization data type to use in int4 training.",
-            'choice': ['fp4', 'nf4']
+            'choices': ['fp4', 'nf4']
         }
     )
 
@@ -75,7 +75,7 @@ class ModelConfig:
 
 
 @dataclass
-class ChatGLMConfig(ModelConfig):
+class ChatGLMArguments(ModelArguments):
     temperature: float = 0.75
     top_p: float = 0.9
     max_tokens: int = 2048

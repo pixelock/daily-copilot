@@ -2,7 +2,10 @@ accelerate
 cpm_kernels
 fire
 flask
+loguru
+datasets
 langchain
 nvidia-ml-py
 sentencepiece
 transformers
+peft

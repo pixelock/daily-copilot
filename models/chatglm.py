@@ -3,15 +3,12 @@
 # @Author: pixelock
 # @Time: 2023/6/10 11:01
 
-from typing import Dict, Optional, Any, List
+from typing import Dict, List
 from torch.nn import Module
 from transformers import AutoModel, AutoTokenizer
 from transformers import BitsAndBytesConfig
 
 from models.base import BaseModel
-from configs.models import ChatGLMConfig
-from configs.training import FinetuningConfig
-from configs.cuda import NUM_GPU
 from utils.cuda import fetch_available_gpus, check_gpu_status
 from utils.quant import prepare_model_for_kbit_training
 
@@ -122,7 +119,7 @@ class ChatGLM(BaseModel):
         return tokenizer
 
     def prepare_model_for_training(self):
-        model = AutoModel(
+        model = AutoModel.from_pretrained(
             self.model_args.model_name_or_path,
             **self.model_kwargs,
         )
@@ -131,6 +128,9 @@ class ChatGLM(BaseModel):
             use_gradient_checkpointing=self.finetuning_args.use_gradient_checkpointing,
         )
         return model
+
+    def prepare_model_for_inference(self):
+        pass
 
 
     # def init_model(self, **kwargs):
